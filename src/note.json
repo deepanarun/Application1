@@ -1,0 +1,461 @@
+{
+    "ruleId": "",
+    "businessView": "DetailedComparativeStatementQuotationComparison1",
+    "defaultSortSetting": {
+        "sortField": "createdAt",
+        "sortDirection": -1
+    },
+    "collection": "quotationDocs",
+    "aggregation":[
+        {
+            "($)match": {
+                "rfxCollectiveNr": "{{inputParams.rfxCollectiveNr}}",
+                "statusHdr": {
+                    "($)nin": [
+                        "draft"
+                    ]
+                }
+            }
+        },
+        {
+            "($)sort": {
+                "createdAt": -1
+            }
+        },
+        {
+            "($)facet": {
+                "paginatedResults": [
+                    {
+                        "($)unwind": "($)items"
+                    },
+                    {
+                        "($)lookup": {
+                            "from": "rfxDocument",
+                            "let": {
+                                "rfxCollectiveNr": "{{inputParams.rfxCollectiveNr}}"
+                            },
+                            "pipeline": [
+                                {
+                                    "($)match": {
+                                        "($)expr": {
+                                            "($)and": [
+                                                {
+                                                    "($)eq": [
+                                                        "($)rfxCollectiveNr",
+                                                        "($)($)rfxCollectiveNr"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },{
+                                    "($)project":{
+                                        "_id":0,
+                                        "rfxStatus":1,
+                                        "items":{
+        "($)map": {
+          "input": "$items",
+          "as": "items",
+          "in": {
+            "purchaseDocumentItem": "$$item.purchaseDocumentItem",
+            "purchaseDocumentNr": "$$item.purchaseDocumentNr",
+             "prValue": "$$item.prValue",
+            "rfqValue": "$$item.rfqValue",
+             "taxCode": "$$item.taxCode",
+            "taxes": "$$item.taxes",
+          }
+        }
+      },
+                                    }
+                                }
+                            ],
+                            "as": "rfxDoc"
+                        }
+                    },
+                    {
+                        "($)unwind": "($)rfxDoc"
+                    },
+                    {
+                        "($)unwind": "($)rfxDoc.items"
+                    },
+                    {
+                        "($)addFields": {
+                            "itemLevelMatch": {
+                                "($)and": [
+                                    {
+                                        "($)eq": [
+                                            "($)items.purchaseDocumentItem",
+                                            "($)rfxDoc.items.purchaseDocumentItem"
+                                        ]
+                                    },
+                                    {
+                                        "($)eq": [
+                                            "($)items.purchaseDocumentNr",
+                                            "($)rfxDoc.items.purchaseDocumentNr"
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "($)lookup": {
+                            "from": "PurchaseRequisition",
+                            "let": {
+                                "purchaseReqNumber": "$items.purchaseDocumentNr"
+                            },
+                            "pipeline": [
+                                {
+                                    "($)match": {
+                                        "($)expr": {
+                                            "($)and": [
+                                                {
+                                                    "($)eq": [
+                                                        "($)purchaseReqNumber",
+                                                        "($)($)purchaseReqNumber"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ],
+                            "as": "purchasereq"
+                        }
+                    },
+                    {
+                        "($)unwind": "($)purchasereq"
+                    },
+                    {
+                        "($)unwind": "($)purchasereq.item"
+                    },
+                    {
+                        "($)addFields": {
+                            "pritemLevelMatch": {
+                                "($)eq": [
+                                    "($)items.purchaseDocumentItem",
+                                    "($)purchasereq.item.purchaseReqItem"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "($)lookup": {
+                            "from": "user",
+                            "let": {
+                                "vendorNumber": "($)vendorUserID"
+                            },
+                            "pipeline": [
+                                {
+                                    "($)match": {
+                                        "($)expr": {
+                                            "($)and": [
+                                                {
+                                                    "($)eq": [
+                                                        "($)userId",
+                                                        "($)($)vendorNumber"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ],
+                            "as": "vend"
+                        }
+                    },
+                    {
+                        "($)unwind": "($)vend"
+                    },
+                    {
+                        "($)match": {
+                            "pritemLevelMatch": true
+                        }
+                    },
+                    {
+                        "($)match": {
+                            "itemLevelMatch": true
+                        }
+                    },
+                    {
+                        "($)group": {
+                            "_id": {
+                                "vendorNumber": "($)vendorUserID",
+                                "purchaseDocumentItem": "($)items.purchaseDocumentItem",
+                                "purchaseDocumentNr": "($)items.purchaseDocumentNr",
+                                "version": "($)version"
+                            },
+                            "purchaseDocumentNr": {
+                                "($)first": "$items.purchaseDocumentNr"
+                            },
+                            "purcahseDocumentItem": {
+                                "($)first": "$items.purchaseDocumentItem"
+                            },
+                            "materialCode": {
+                                "($)first": "($)items.materialCode"
+                            },
+                            "schQuotationNr": {
+                                "($)first": "($)schQuotationNr"
+                            },
+                            "UOM": {
+                                "($)first": "($)items.quantityUnit"
+                            },
+                            "businessLocation": {
+                                "($)first": "($)items.businessLocation"
+                            },
+                            "prQuantity": {
+                                "($)first": "($)items.requestedQuantity"
+                            },
+                            "prPriceUnit": {
+                                "($)first": "($)items.priceUnit"
+                            },
+                            "prPriceQuantity": {
+                                "($)first": "($)items.requestedQuantity"
+                            },
+                            "description": {
+                                "($)first": "($)items.briefDescription"
+                            },
+                            "freightCharges": {
+                                "($)first": "($)items.freightCharges"
+                            },
+                            "quantity": {
+                                "($)first": "($)items.quantity"
+                            },
+                            "status": {
+                                "($)first": "($)statusHdr"
+                            },
+                            "latestQuotation": {
+                                "($)first": "($)latestQuotation"
+                            },
+                            "vendorName1": {
+                                "($)first": "($)vend.companyName"
+                            },
+                            "vendorName2": {
+                                "($)first": "($)vend.firstName"
+                            },
+                            "rfxStatus": {
+                                "($)first": "($)rfxDoc.rfxStatus"
+                            },
+                            "unitPriceQuotation": {
+                                "($)first": "($)items.unitPrice"
+                            },
+                            "basicPriceQuotation": {
+                                "($)first": "($)items.basicAmountAfterDisc"
+                            },
+                            "plant": {
+                                "($)first": "($)items.plant"
+                            },
+                            "prRate": {
+                                "($)first": "($)items.priceUnit"
+                            },
+                            "prValue": {
+                                "($)first": "($)rfxDoc.items.prValue"
+                            },
+                            "internalValue": {
+                                "($)first": "($)rfxDoc.items.rfqValue"
+                            },
+                            "internalRate": {
+                                "($)first": "($)items.internalRate"
+                            },
+                            "amount": {
+                                "($)first": "($)items.TotalAmountOfQuotation"
+                            },
+                            "insuranceCharges": {
+                                "($)first": "($)items.insuranceCharges"
+                            },
+                            "taxCode": {
+                                "($)first": "($)rfxDoc.items.taxCode"
+                            },
+                            "tax": {
+                                "($)first": "($)rfxDoc.items.taxes"
+                            },
+                            "taxAmount": {
+                                "($)first": "($)items.taxAmount"
+                            },
+                            "grantQty": {
+                                "($)first": "($)items.grantQty"
+                            },
+                            "packingCharges": {
+                                "($)first": "($)items.packingCharges"
+                            },
+                            "version": {
+                                "($)first": "($)version"
+                            },
+                            "itemText": {
+                                "($)first": "($)items.itemText"
+                            },
+                            "otherCharges": {
+                                "($)first": "($)items.otherCharges"
+                            },
+                            "createdAt": {
+                                "($)first": "($)createdAt"
+                            }
+                        }
+                    },
+                    {
+                        "($)addFields": {
+                            "dateString": {
+                                "($)dateToString": {
+                                    "format": "(%d-%m-%Y T %H:%M:%S)",
+                                    "date": {
+                                        "($)toDate": {
+                                            "($)dateToString": {
+                                                "format": "%Y-%m-%dT%H:%M:%S.%LZ",
+                                                "date": "($)createdAt"
+                                            }
+                                        }
+                                    },
+                                    "timezone": "Asia/Kolkata"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "($)addFields": {
+                            "businessLocationString": {
+                                "($)toString": "($)businessLocation"
+                            }
+                        }
+                    },
+                    {
+                        "($)lookup": {
+                            "from": "code",
+                            "let": {
+                                "code": "($)businessLocationString",
+                                "codeType": "businessLocation"
+                            },
+                            "pipeline": [
+                                {
+                                    "($)match": {
+                                        "($)expr": {
+                                            "($)and": [
+                                                {
+                                                    "($)eq": [
+                                                        "($)codeType",
+                                                        "($)($)codeType"
+                                                    ]
+                                                },
+                                                {
+                                                    "($)eq": [
+                                                        "($)code",
+                                                        "($)($)code"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ],
+                            "as": "businessLocation1"
+                        }
+                    },
+                    {
+                        "($)unwind": {
+                            "path": "($)businessLocation1",
+                            "preserveNullAndEmptyArrays": true
+                        }
+                    },
+                    {
+                        "($)addFields": {
+                            "businessLocationCode": {
+                                "($)arrayElemAt": [
+                                    "($)businessLocation1.codeDescription",
+                                    0
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "($)project": {
+                            "purcahseDocumentItem": "($)purcahseDocumentItem",
+                            "purchaseDocumentNr": "($)purchaseDocumentNr",
+                            "materialCode": "($)materialCode",
+                            "latestQuotation": "($)latestQuotation",
+                            "schQuotationNr": "($)schQuotationNr",
+                            "UOM": "($)UOM",
+                            "prPriceUnit": "($)prPriceUnit",
+                            "prPriceQuantity": "($)prPriceQuantity",
+                            "status": "($)status",
+                            "createdAt": "($)createdAt",
+                            "rfxStatus": "($)rfxStatus",
+                            "businessLocation": "($)businessLocationCode.description",
+                            "prAmount": {
+                                "($)multiply": [
+                                    "($)prPriceUnit",
+                                    "($)prPriceQuantity"
+                                ]
+                            },
+                            "unitPriceQuotation": "($)unitPriceQuotation",
+                            "basicPriceQuotation": "($)basicPriceQuotation",
+                            "rfxCollectiveNr": "{{inputParams.rfxCollectiveNr}}",
+                            "prQuantity": "($)prQuantity",
+                            "description": "($)description",
+                            "freightCharges": "($)freightCharges",
+                            "quantity": "($)quantity",
+                            "plant": "($)plant",
+                            "PRRateRate": "($)prRate",
+                            "otherCharges": "($)otherCharges",
+                            "prValue": {
+                                "($)multiply": [
+                                    "($)prPriceUnit",
+                                    "($)prPriceQuantity"
+                                ]
+                            },
+                            "internalValue": {
+                                "($)multiply": [
+                                    "($)internalRate",
+                                    "($)prPriceQuantity"
+                                ]
+                            },
+                            "internalRateRate": "($)internalRate",
+                            "amount": "($)amount",
+                            "taxCode": "($)taxCode",
+                            "tax": "($)tax",
+                            "GST": "($)tax",
+                            "insuranceCharges": "($)insuranceCharges",
+                            "taxAmount": "($)taxAmount",
+                            "packingCharges": "($)packingCharges",
+                            "vendorName": {
+                                "($)ifNull": [
+                                    "($)vendorName1",
+                                    "($)vendorName2"
+                                ]
+                            },
+                            "itemText": "($)itemText",
+                            "uniqueKey": {
+                                "($)concat": [
+                                    "($)purchaseDocumentNr",
+                                    "-",
+                                    "($)purcahseDocumentItem"
+                                ]
+                            },
+                            "grantQty": "($)grantQty",
+                            "version1": "($)version",
+                            "version": {
+                                "($)concat": [
+                                    "($)schQuotationNr",
+                                    " - ",
+                                    "($)version",
+                                    " - ",
+                                    "($)dateString"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "($)sort": {
+                            "createdAt": -1,
+                            "schQuotationNr": -1,
+                            "version1": -1
+                        }
+                    }
+                ],
+                "totalCount": [
+                    {
+                        "($)count": "count"
+                    }
+                ]
+            }
+        }
+    ]
+}
